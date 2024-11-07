@@ -17,14 +17,21 @@ fun Application.configureRouting() {
 
         post("/cart/add") {
             val cartItem = call.receive<CartItem>()
+//            val isItemInCart = cart.items.contains(cartItem)
+            val isItemInCart = cart.items.find({ item:CartItem -> item.itemId == cartItem.itemId}) != null
 
-            if(cart.items.contains(cartItem)){
-                val itemInCart =  cart.items.find({item:CartItem -> item.itemId == cartItem.itemId})
-                itemInCart.quantity += 1
+//            if(isItemInCart){
+//                val itemInCart =  cart.items.find({item:CartItem -> item.itemId == cartItem.itemId})
+//                itemInCart.quantity += 1
+//            }else{
+//                cart.items.add(cartItem)
+//            }
+            if(isItemInCart) {
+                call.respond(HttpStatusCode.BadRequest, "Item already exists in cart")
+            } else{
+                cart.items.add(cartItem)
+                call.respond(HttpStatusCode.Created, "Item SuccessFully Created!")
             }
-
-            cart.items.add(cartItem)
-            call.respond(HttpStatusCode.Created, "Item SuccessFully Created!")
         }
 
         put("/cart/update/{itemId}") {
