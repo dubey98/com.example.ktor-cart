@@ -1,4 +1,4 @@
-# Cart Application in Kotlin
+# Cart Application
 
 This is a practice kotlin cart application.
 
@@ -23,11 +23,16 @@ curl --location 'http://0.0.0.0:8080/cart/add' \
 
 DELETE request for deleting items in cart
 ```declarative
-
+curl --location --request DELETE 'http://0.0.0.0:8080/cart/remove/1'
 ```
 
 update request for updating items in cart
 ```declarative
-
+curl --location --request PATCH 'http://0.0.0.0:8080/cart/update/1' \
+--header 'Content-Type: application/json' \
+--data '{
+    "quantity": 4,
+    "price" : 50000.00
+}'
 ```
 
