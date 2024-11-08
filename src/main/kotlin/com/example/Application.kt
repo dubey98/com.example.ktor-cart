@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.database.DatabaseFactory
 import com.example.plugins.*
 import io.ktor.server.application.*
 import io.ktor.serialization.*
@@ -11,6 +12,8 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
+    DatabaseFactory.init()
+
     install(ContentNegotiation) {
         json()
     }

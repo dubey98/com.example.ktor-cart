@@ -6,89 +6,110 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.transactions.transaction
 
-val cart:Cart = Cart()
+
+val cart: Cart = Cart()
 
 @Serializable
-data class UpdateRequest (
-    val quantity: Int?  = null,
-    val price:Double? = null,
-    val name:String? = null
+data class UpdateRequest(
+    val quantity: Int? = null,
+    val price: Double? = null,
+    val name: String? = null
 )
 
 fun Application.configureRouting() {
     routing {
         get("/cart") {
-            call.respond(cart.items)
+            val cartItems = withContext(Dispatchers.IO) {
+                transaction {
+                    CartItems.selectAll().map {
+                        CartItem(
+                            id = it[CartItems.id].value,
+                            name = it[CartItems.name],
+                            quantity = it[CartItems.quantity],
+                            price = it[CartItems.price]
+                        )
+                    }
+                }
+            }
+
+            call.respond(cartItems)
         }
 
         post("/cart/add") {
             val cartItem = call.receive<CartItem>()
-//            val isItemInCart = cart.items.contains(cartItem)
-            val isItemInCart = cart.items.find({ item:CartItem -> item.itemId == cartItem.itemId}) != null
 
-//            if(isItemInCart){
-//                val itemInCart =  cart.items.find({item:CartItem -> item.itemId == cartItem.itemId})
-//                itemInCart.quantity += 1
-//            }else{
-//                cart.items.add(cartItem)
-//            }
-            if(isItemInCart) {
-                call.respond(HttpStatusCode.BadRequest, "Item already exists in cart")
-            } else{
-                cart.items.add(cartItem)
-                call.respond(HttpStatusCode.Created, "Item SuccessFully Created!")
+            val newItemId = withContext(Dispatchers.IO) {
+                transaction {
+                    CartItems.insertAndGetId {
+                        it[name] = cartItem.name
+                        it[price] = cartItem.price
+                        it[quantity] = cartItem.quantity
+                    }.value
+                }
             }
+
+            call.respond(HttpStatusCode.Created, "Item created with id $newItemId")
         }
 
-        patch("/cart/update/{itemId}") {
-            val itemIdAsText = call.parameters["itemId"]
-            if (itemIdAsText == null){
+        patch("/cart/update/{id}") {
+            val itemId = call.parameters["id"]?.toIntOrNull()
+            if (itemId == null) {
                 call.respond(HttpStatusCode.BadRequest, "Missing ItemId Parameter")
+                return@patch
             }
 
             try {
-                val itemId = itemIdAsText?.toInt()
-                val itemInCart = cart.items.find { item:CartItem -> item.itemId == itemId }
-
-                if(itemInCart == null) {
-                    call.respond(HttpStatusCode.NotFound)
-                }
-
                 val dataToUpdate = call.receive<UpdateRequest>()
 
-                dataToUpdate.quantity?.let { itemInCart?.quantity = it as Int }
+                val updatedRows = withContext(Dispatchers.IO) {
+                    transaction {
+                        CartItems.update ({ CartItems.id eq itemId}) {
+                            dataToUpdate.name?.let { name -> it[CartItems.name] = name }
+                            dataToUpdate.quantity?.let { quantity -> it[CartItems.quantity]  = quantity }
+                            dataToUpdate.price?.let { price -> it[CartItems.price] = price }
+                        }
+                    }
+                }
 
-                dataToUpdate.price?.let { itemInCart?.price  = it as Double }
+                if(updatedRows > 0) {
+                    call.respond(HttpStatusCode.OK, "Successfully Updated")
+                } else {
+                    call.respond(HttpStatusCode.NotFound, "This id does not exist")
+                }
 
-                call.respond(HttpStatusCode.OK, "Successfully Updated")
-            } catch(ex: IllegalArgumentException){
+            } catch (ex: IllegalArgumentException) {
                 println(ex)
                 call.respond(HttpStatusCode.BadRequest)
             }
         }
 
-        delete("/cart/remove/{itemId}") {
-            val itemIdAsText = call.parameters["itemId"]
-            if(itemIdAsText == null) {
-                call.respond(HttpStatusCode.BadRequest, "Missing Item id to delete item")
+        delete("/cart/remove/{id}") {
+            val itemId = call.parameters["id"]?.toIntOrNull()
+            if (itemId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Missing id to delete item")
+                return@delete
             }
 
             try {
-                val itemId = itemIdAsText?.toInt()
-                val cartItem = cart.items.find({ item: CartItem -> item.itemId == itemId})
-                println("itemId $itemId")
-                println(cartItem)
-
-                if(cartItem == null){
-                    call.respond(HttpStatusCode.NotFound)
+                val deletedRows = withContext(Dispatchers.IO) {
+                    transaction {
+                        CartItems.deleteWhere { CartItems.id eq itemId }
+                    }
                 }
 
-                cart.items.remove(cartItem)
-
-                call.respond(HttpStatusCode.OK, "Item Successfully Deleted")
-            } catch(ex: IllegalArgumentException) {
+                if (deletedRows > 0) {
+                    call.respond(HttpStatusCode.OK, "Cart item deleted with id: $itemId")
+                } else {
+                    call.respond(HttpStatusCode.NotFound)
+                }
+            } catch (ex: IllegalArgumentException) {
                 call.respond(HttpStatusCode.BadRequest)
             }
         }

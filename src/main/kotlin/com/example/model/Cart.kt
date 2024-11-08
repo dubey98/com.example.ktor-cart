@@ -1,5 +1,5 @@
 package com.example.model
 
-data class Cart (
+class Cart (
     val items: MutableList<CartItem> = mutableListOf()
 )
