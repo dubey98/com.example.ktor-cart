@@ -9,6 +9,7 @@ import javax.inject.Singleton
 @Module
 class CartServiceModule {
     @Provides
+    @Singleton
     fun provideCartService(): CartService{
         return CartServiceImpl()
     }

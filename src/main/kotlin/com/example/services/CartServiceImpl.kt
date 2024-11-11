@@ -11,7 +11,6 @@ import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
-import javax.inject.Inject
 
 interface CartService {
     suspend fun getAllItems(): List<CartItem>

@@ -1,7 +1,7 @@
 package com.example.plugins
 
-import com.example.di.component.DaggerCartServiceComponent
 import com.example.model.*
+import com.example.services.CartService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -16,10 +16,7 @@ data class UpdateRequest (
     val name: String? = null
 )
 
-fun Application.configureRouting() {
-
-    val cartService = DaggerCartServiceComponent.create().getCartService()
-
+fun Application.configureRouting(cartService: CartService) {
     routing {
         get("/cart") {
             val cartItems = cartService.getAllItems()

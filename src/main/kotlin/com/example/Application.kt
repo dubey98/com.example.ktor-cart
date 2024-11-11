@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.database.DatabaseFactory
+import com.example.di.component.DaggerCartServiceComponent
 import com.example.plugins.*
 import io.ktor.server.application.*
 import io.ktor.serialization.kotlinx.json.*
@@ -17,23 +18,7 @@ fun Application.module() {
         json()
     }
 
-    configureRouting()
-}
+    val cartService = DaggerCartServiceComponent.create().getCartService()
 
-//class KtorApplication: Application() {
-//    @Inject
-//    late init var cartService: CartService
-//
-//    fun Application.module() {
-//        val appComponent = AppComponent.create()
-//        appComponent.inject(this@KtorApplication)
-//
-//        DatabaseFactory.init()
-//
-//        install(ContentNegotiation) {
-//            json()
-//        }
-//
-//        configureRouting(cartService)
-//    }
-//}
+    configureRouting(cartService)
+}
