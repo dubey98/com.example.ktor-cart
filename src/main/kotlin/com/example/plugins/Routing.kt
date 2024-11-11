@@ -1,59 +1,35 @@
 package com.example.plugins
 
+import com.example.di.component.DaggerCartServiceComponent
 import com.example.model.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
-
-
-val cart: Cart = Cart()
 
 @Serializable
-data class UpdateRequest(
+data class UpdateRequest (
     val quantity: Int? = null,
     val price: Double? = null,
     val name: String? = null
 )
 
 fun Application.configureRouting() {
+
+    val cartService = DaggerCartServiceComponent.create().getCartService()
+
     routing {
         get("/cart") {
-            val cartItems = withContext(Dispatchers.IO) {
-                transaction {
-                    CartItems.selectAll().map {
-                        CartItem(
-                            id = it[CartItems.id].value,
-                            name = it[CartItems.name],
-                            quantity = it[CartItems.quantity],
-                            price = it[CartItems.price]
-                        )
-                    }
-                }
-            }
-
+            val cartItems = cartService.getAllItems()
             call.respond(cartItems)
         }
 
         post("/cart/add") {
             val cartItem = call.receive<CartItem>()
 
-            val newItemId = withContext(Dispatchers.IO) {
-                transaction {
-                    CartItems.insertAndGetId {
-                        it[name] = cartItem.name
-                        it[price] = cartItem.price
-                        it[quantity] = cartItem.quantity
-                    }.value
-                }
-            }
+            val newItemId = cartService.addItemsInCart(cartItem)
 
             call.respond(HttpStatusCode.Created, "Item created with id $newItemId")
         }
@@ -68,17 +44,9 @@ fun Application.configureRouting() {
             try {
                 val dataToUpdate = call.receive<UpdateRequest>()
 
-                val updatedRows = withContext(Dispatchers.IO) {
-                    transaction {
-                        CartItems.update ({ CartItems.id eq itemId}) {
-                            dataToUpdate.name?.let { name -> it[CartItems.name] = name }
-                            dataToUpdate.quantity?.let { quantity -> it[CartItems.quantity]  = quantity }
-                            dataToUpdate.price?.let { price -> it[CartItems.price] = price }
-                        }
-                    }
-                }
+                val updatedRows = cartService.updateItemInCart(itemId, dataToUpdate)
 
-                if(updatedRows > 0) {
+                if (updatedRows > 0) {
                     call.respond(HttpStatusCode.OK, "Successfully Updated")
                 } else {
                     call.respond(HttpStatusCode.NotFound, "This id does not exist")
@@ -98,11 +66,7 @@ fun Application.configureRouting() {
             }
 
             try {
-                val deletedRows = withContext(Dispatchers.IO) {
-                    transaction {
-                        CartItems.deleteWhere { CartItems.id eq itemId }
-                    }
-                }
+                val deletedRows = cartService.removeItemFromCart(itemId)
 
                 if (deletedRows > 0) {
                     call.respond(HttpStatusCode.OK, "Cart item deleted with id: $itemId")
